@@ -4,6 +4,8 @@ from typing import Sequence
 from datetime import datetime
 from typing import Tuple
 
+from nmea0183 import parse_nmea, parse_nmea_rmc
+
 bdata = pathlib.Path('data.ping_packets').read_bytes()
 
 import struct
@@ -21,107 +23,6 @@ class PingPacketRaw:
     src_device_id: int
     dest_device_id: int
     payload: bytes
-
-
-@dataclass
-class NMEAPacket:
-    talker_id: str
-    sentence_id: str
-    words: Tuple[str]
-
-
-def nmea_datetime(datestr, timestr):
-    assert timestr[6] == '.'
-    return datetime(
-        day=int(datestr[0:2]),
-        month=int(datestr[2:4]),
-        year=(int(datestr[4:6]) - 50) % 100 + 1950,
-        hour=int(timestr[0:2]),
-        minute=int(timestr[2:4]),
-        second=int(timestr[4:6]),
-        microsecond=int(timestr[7:9]) * 10000
-    )
-
-
-def parse_ns(ns):
-    if ns == 'N':
-        return +1
-    elif ns == 'S':
-        return -1
-    raise ValueError()
-
-
-def parse_ew(ew):
-    if ew == 'E':
-        return +1
-    elif ew == 'W':
-        return -1
-    raise ValueError()
-
-
-@dataclass
-class NMEASentenceRMC:
-    timestamp: datetime = None
-    status_ok: bool = False
-    latitude_n: float = 0.0
-    longitude_e: float = 0.0
-    speed_over_ground_knots: float = 0.0
-    track_made_good_degrees_true: float = 0.0
-    magnetic_variation_degrees_e: float = 0.0
-
-
-def parse_nmea_rmc(words: Sequence[str]):
-    assert words[1] in ('A', 'V')
-    return NMEASentenceRMC(
-        timestamp=nmea_datetime(datestr=words[8],
-            timestr=words[0]),
-        status_ok=(words[1] == 'A'),
-        latitude_n=float(words[2]) * parse_ns(words[3]),
-        longitude_e=float(words[4]) * parse_ew(words[5]),
-        speed_over_ground_knots=float(words[6]),
-        track_made_good_degrees_true=(
-            None if words[7] == '' else float(words[7])),
-        magnetic_variation_degrees_e=(
-            None if words[9] == '' else (float(words[9]) * parse_ew(words[
-                10]))),
-    )
-
-
-def parse_nmea(payload: bytes):
-    payload_str = payload.decode('ascii')
-    assert payload_str.startswith('$')
-    assert payload_str.endswith('\r\n')
-    assert payload_str[6] == ','
-
-    return NMEAPacket(
-        payload_str[1:3],
-        payload_str[3:6],
-        tuple(payload_str[7:-2].split(','))
-    )
-
-
-class Profile6Packet:
-    ping_number: int
-    start_mm: int
-    length_mm: int
-    start_ping_hz: int
-    end_ping_hz: int
-    adc_sample_hz: int
-    timestep_ms: int
-    ping_duration_s: float
-    analog_gain: float
-    max_power: float
-    min_power: float
-    step_db: float
-    is_db: bool
-    gain_index: int
-    decimation: int
-    num_results: int
-    scaled_db_pwr_results: list[int]
-
-
-def parse_profile6(payload: bytes):
-    pass
 
 
 BLOCK_SIZE = 'b207'  # ???
@@ -155,12 +56,6 @@ class SL2BlockHeader:
         packetsize = 0
 
 
-
-@dataclass
-class PingPacketProfile6:
-    pass
-
-
 def ping_seek(b: bytes):
     return b.find(b'BR')
 
@@ -168,15 +63,20 @@ def ping_seek(b: bytes):
 def ping_unpack_from(b: io.BytesIO):
     prelude_fmt = '2sHHBB'
     prelude_bytes = b.read(8)
-    start, payload_len, message_id, src_device_id, dest_device_id = \
-        struct.unpack(prelude_fmt, prelude_bytes)
+    start, payload_len, message_id, src_device_id, dest_device_id = struct.unpack(
+        prelude_fmt, prelude_bytes
+    )
     assert start == b'BR'
     payload_bytes = b.read(payload_len)
     checksum, = struct.unpack('H', b.read(2))
     expected_checksum = sum(prelude_bytes + payload_bytes) % 2 ** 16
     assert checksum == expected_checksum
-    return PingPacketRaw(message_id=message_id, src_device_id=src_device_id,
-        dest_device_id=dest_device_id, payload=payload_bytes)
+    return PingPacketRaw(
+        message_id=message_id,
+        src_device_id=src_device_id,
+        dest_device_id=dest_device_id,
+        payload=payload_bytes,
+    )
 
 
 if __name__ == '__main__':
@@ -186,7 +86,7 @@ if __name__ == '__main__':
             try:
                 packets.append(ping_unpack_from(f))
             except Exception as e:
-                print("bad packet")
+                print('bad packet')
     talkers = Counter()
     sentences = Counter()
     talkersentences = Counter()
@@ -200,6 +100,8 @@ if __name__ == '__main__':
             if nmea.sentence_id == 'RMC':
                 print(parse_nmea_rmc(nmea.words))
         elif pkt.message_id == MESSAGE_ID_PROFILE6:
+            import dan_ping
+
             pass
         else:
             print(f'skipping message id {pkt.message_id}')
