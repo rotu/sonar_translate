@@ -47,5 +47,6 @@ profile6_schema = c.Struct(
     gain_index=c.Int8ul,
     decimation=c.Int8ul,
     padding_3=c.Padding(1),
-    scaled_db_pwr_results=c.PrefixedArray(c.Int16ul, c.Int16ul),
+    num_results = c.Int16ul,
+    scaled_db_pwr_results=c.Array(c.this.num_results,c.Int16ul)
 )

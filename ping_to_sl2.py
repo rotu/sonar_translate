@@ -1,9 +1,7 @@
 import pathlib
 from collections import Counter
+from math import log
 from types import SimpleNamespace
-from typing import Sequence
-from datetime import datetime
-from typing import Tuple
 
 from nmea0183 import parse_nmea, parse_nmea_rmc
 
@@ -105,28 +103,21 @@ if __name__ == '__main__':
     ping_packets = from_construct(parsed)
     talkers = Counter()
     sentences = Counter()
-    talkersentences = Counter()
+    talker_sentences = Counter()
+
     for pkt in ping_packets:
         if pkt.message_id == MESSAGE_ID_NMEA0183:
             nmea = parse_nmea(pkt.payload)
             talkers[nmea.talker_id] += 1
             sentences[nmea.sentence_id] += 1
-            talkersentences[nmea.talker_id + nmea.sentence_id] += 1
+            talker_sentences[nmea.talker_id + nmea.sentence_id] += 1
 
             if nmea.sentence_id == 'RMC':
                 print(parse_nmea_rmc(nmea.words))
-        elif pkt.message_id == MESSAGE_ID_PROFILE6:
-            p6 = from_construct(dan_ping.profile6_schema.parse(
-                pkt.payload
-            ))
-            print('n_pings', len(p6.scaled_db_pwr_results))
-            pass
-        else:
-            print(f'skipping message id {pkt.message_id}')
 
     print(f'nmea talkers: {talkers}')
     print(f'nmea sentences: {sentences}')
-    print(f'talker sentences: {talkersentences}')
+    print(f'talker sentences: {talker_sentences}')
 
     # nmea talkers: Counter({'GN': 13, 'GP': 9, 'GL': 6})
     # nmea sentences: Counter({'GSV': 15, 'GSA': 5, 'GLL': 2, 'RMC': 2, 'VTG': 2, 'GGA': 2})
@@ -142,3 +133,26 @@ if __name__ == '__main__':
     #       useful!
 
     # probably only need rmc
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    imdata = []
+    for x, pkt in enumerate(ping_packets):
+        if pkt.message_id == MESSAGE_ID_PROFILE6:
+            p6 = from_construct(dan_ping.profile6_schema.parse(
+                pkt.payload
+            ))
+
+            pwr_or_db = p6.min_pwr + np.array(
+                p6.scaled_db_pwr_results) * p6.step_db
+            db = pwr_or_db if p6.is_db else log(pwr_or_db)
+            imrow = np.interp(
+                np.linspace(0.0, 1.0, 1000),
+                np.linspace(0.0, 1.0, len(db)),
+                db
+            )
+            imdata.append(imrow)
+
+    im = plt.pcolormesh(imdata)
+    plt.show()

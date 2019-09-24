@@ -1,1 +1,3 @@
+numpy
+matplotlib
 construct>=2.9
