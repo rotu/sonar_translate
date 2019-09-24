@@ -1,5 +1,6 @@
 import pathlib
 from collections import Counter
+from types import SimpleNamespace
 from typing import Sequence
 from datetime import datetime
 from typing import Tuple
@@ -79,18 +80,33 @@ def ping_unpack_from(b: io.BytesIO):
     )
 
 
+def from_construct(a_construct):
+    if isinstance(a_construct, c.ListContainer):
+        return list(from_construct(i) for i in a_construct)
+    if isinstance(a_construct, c.Container):
+        if set(a_construct.keys()) == {
+            'data', 'value', 'offset1', 'offset2', 'length'
+        }:
+            return from_construct(a_construct.value)
+        return SimpleNamespace(**{
+            k: from_construct(v) for k, v in a_construct.items() if k != '_io'
+        })
+    else:
+        return a_construct
+
+
+import construct as c
+import dan_ping
+
 if __name__ == '__main__':
-    packets = []
-    with pathlib.Path('data.ping_packets').open('rb') as f:
-        while f.peek():
-            try:
-                packets.append(ping_unpack_from(f))
-            except Exception as e:
-                print('bad packet')
+    parsed = c.GreedyRange(dan_ping.ping_schema).parse_file(
+        'data.ping_packets')
+
+    ping_packets = from_construct(parsed)
     talkers = Counter()
     sentences = Counter()
     talkersentences = Counter()
-    for pkt in packets:
+    for pkt in ping_packets:
         if pkt.message_id == MESSAGE_ID_NMEA0183:
             nmea = parse_nmea(pkt.payload)
             talkers[nmea.talker_id] += 1
@@ -100,8 +116,10 @@ if __name__ == '__main__':
             if nmea.sentence_id == 'RMC':
                 print(parse_nmea_rmc(nmea.words))
         elif pkt.message_id == MESSAGE_ID_PROFILE6:
-            import dan_ping
-
+            p6 = from_construct(dan_ping.profile6_schema.parse(
+                pkt.payload
+            ))
+            print('n_pings', len(p6.scaled_db_pwr_results))
             pass
         else:
             print(f'skipping message id {pkt.message_id}')
