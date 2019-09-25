@@ -1,12 +1,3 @@
-import functools
-import struct
-from array import array
-from dataclasses import dataclass
-from typing import Sequence
-import sys
-import construct
-import brping
-
 # important stuff = position of boat
 # Do I need to interpolate GPS? For now, no.
 #
@@ -47,6 +38,6 @@ profile6_schema = c.Struct(
     gain_index=c.Int8ul,
     decimation=c.Int8ul,
     padding_3=c.Padding(1),
-    num_results = c.Int16ul,
-    scaled_db_pwr_results=c.Array(c.this.num_results,c.Int16ul)
+    num_results=c.Int16ul,
+    scaled_db_pwr_results=c.Array(c.this.num_results, c.Int16ul)
 )

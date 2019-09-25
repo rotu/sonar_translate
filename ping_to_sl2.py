@@ -1,3 +1,4 @@
+import math
 import pathlib
 from collections import Counter
 from math import log
@@ -22,37 +23,6 @@ class PingPacketRaw:
     src_device_id: int
     dest_device_id: int
     payload: bytes
-
-
-BLOCK_SIZE = 'b207'  # ???
-SL2_HEADER = bytes.fromhex('020000' + BLOCK_SIZE + '00000800')
-
-
-class SL2BlockHeader:
-    def __init__(self):
-        this_frame_byte_offset = 0
-        last_frame_byte_offset = 0
-        blockSize = 0
-        lastBlockSize = 0
-        channel = 0
-        packetSize = 0
-        frameIndex = 0
-        upperlimit_feet = 0.0
-        lowerlimit_feet = 0.0
-        frequency = 0
-        time1 = 0
-        waterdepth_feet = 0.0
-        speed_knots = 0
-        water_temperature_c = 0.0
-        easting = 0
-        northing = 0
-        waterspeed_knots = 0.0
-        course_over_ground_radians = 0.0
-        altitude_ft = 0.0
-        heading_radians = 0.0
-        validity_bitmask = 0
-        timeoffset = 0
-        packetsize = 0
 
 
 def ping_seek(b: bytes):
@@ -97,8 +67,10 @@ import construct as c
 import dan_ping
 
 if __name__ == '__main__':
-    parsed = c.GreedyRange(dan_ping.ping_schema).parse_file(
-        'data.ping_packets')
+    # filename = 'data.ping_packets'
+    filename = 'good barge at 25m.ping_packets'
+
+    parsed = c.GreedyRange(dan_ping.ping_schema).parse_file(filename)
 
     ping_packets = from_construct(parsed)
     talkers = Counter()
@@ -134,25 +106,50 @@ if __name__ == '__main__':
 
     # probably only need rmc
 
+    p6_packets = [from_construct(dan_ping.profile6_schema.parse(
+        pkt.payload
+    )) for pkt in ping_packets if pkt.message_id == MESSAGE_ID_PROFILE6]
+
     import matplotlib.pyplot as plt
     import numpy as np
 
+    min_time = p6_packets[0].timestamp_msec / 1000
+    max_time = p6_packets[-1].timestamp_msec / 1000
+    if not (min_time < max_time):
+        min_time = 0
+        max_time = 0.1 * len(p6_packets)
+    n_time = len(p6_packets)
+    min_dist_mm = min(p6.start_mm for p6 in p6_packets)
+    max_dist_mm = max(p6.start_mm + p6.length_mm for p6 in p6_packets)
+    n_dist = 1000
+
     imdata = []
-    for x, pkt in enumerate(ping_packets):
-        if pkt.message_id == MESSAGE_ID_PROFILE6:
-            p6 = from_construct(dan_ping.profile6_schema.parse(
-                pkt.payload
-            ))
 
-            pwr_or_db = p6.min_pwr + np.array(
-                p6.scaled_db_pwr_results) * p6.step_db
-            db = pwr_or_db if p6.is_db else log(pwr_or_db)
-            imrow = np.interp(
-                np.linspace(0.0, 1.0, 1000),
-                np.linspace(0.0, 1.0, len(db)),
-                db
-            )
-            imdata.append(imrow)
+    for p6 in p6_packets:
+        assert math.isclose(p6.max_pwr - p6.min_pwr,
+            p6.step_db * ((1 << 16) - 1))
 
-    im = plt.pcolormesh(imdata)
+        pwr_or_db = (
+            p6.min_pwr + np.array(p6.scaled_db_pwr_results) * p6.step_db
+        )
+        db = pwr_or_db if p6.is_db else log(pwr_or_db)
+        imrow = np.interp(
+            np.linspace(min_dist_mm, max_dist_mm, n_dist),
+            np.linspace(p6.start_mm, p6.start_mm + p6.length_mm, len(db)),
+            db
+        )
+        imdata.append(imrow)
+    x = np.shape(imdata)
+
+    im = plt.pcolormesh(
+        np.linspace(min_dist_mm, max_dist_mm, n_dist) / 1000,
+        np.linspace(min_time, max_time, n_time),
+        imdata,
+        # cmap='ocean'
+    )
+    plt.title(filename)
+    plt.colorbar().set_label('decibels')
+    plt.xlabel('distance (meters)')
+    plt.ylabel('time (seconds)')
+
     plt.show()
