@@ -1,17 +1,10 @@
 import math
-import pathlib
 from collections import Counter
+from dataclasses import dataclass
 from math import log
 from types import SimpleNamespace
 
 from nmea0183 import parse_nmea, parse_nmea_rmc
-
-bdata = pathlib.Path('data.ping_packets').read_bytes()
-
-import struct
-
-from dataclasses import dataclass
-import io
 
 MESSAGE_ID_NMEA0183 = 9
 MESSAGE_ID_PROFILE6 = 1308
@@ -23,29 +16,6 @@ class PingPacketRaw:
     src_device_id: int
     dest_device_id: int
     payload: bytes
-
-
-def ping_seek(b: bytes):
-    return b.find(b'BR')
-
-
-def ping_unpack_from(b: io.BytesIO):
-    prelude_fmt = '2sHHBB'
-    prelude_bytes = b.read(8)
-    start, payload_len, message_id, src_device_id, dest_device_id = struct.unpack(
-        prelude_fmt, prelude_bytes
-    )
-    assert start == b'BR'
-    payload_bytes = b.read(payload_len)
-    checksum, = struct.unpack('H', b.read(2))
-    expected_checksum = sum(prelude_bytes + payload_bytes) % 2 ** 16
-    assert checksum == expected_checksum
-    return PingPacketRaw(
-        message_id=message_id,
-        src_device_id=src_device_id,
-        dest_device_id=dest_device_id,
-        payload=payload_bytes,
-    )
 
 
 def from_construct(a_construct):
