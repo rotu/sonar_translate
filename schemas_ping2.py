@@ -1,10 +1,5 @@
-# important stuff = position of boat
-# Do I need to interpolate GPS? For now, no.
-#
-
-
-import warnings
 import re
+import warnings
 
 import construct as c
 
@@ -122,14 +117,16 @@ def parse_nmea_rmc(words: Sequence[str]):
 
 def parse_nmea(payload: bytes):
     payload_str = payload.decode('ascii')
-    assert payload_str.startswith('$')
-    if not (payload_str.endswith('\r\n')):
+    match = re.match(r'(\$?)([A-Z]{2})([A-Z]{3}),(.*)(\r?\n?)', payload_str)
+    start, talker_id, sentence_id, words, end = match.groups()
+    if start != '$':
         warnings.warn(
-            f'NMEA0183 string {payload_str!r} did not end with \\r\\n')
-    assert payload_str[6] == ','
-
+            fr'NMEA0183 string {payload_str!r} did not start with $')
+    if end != '\r\n':
+        warnings.warn(
+            fr'NMEA0183 string {payload_str!r} did not end with \r\n')
     return NMEAPacket(
-        talker_id=payload_str[1:3],
-        sentence_id=payload_str[3:6],
-        words=tuple(payload_str[7:].rstrip('\r\n').split(','))
+        talker_id=talker_id,
+        sentence_id=sentence_id,
+        words=tuple(words.split(','))
     )

@@ -1,9 +1,9 @@
 from pathlib import Path
 
 import construct as c
-import schemas_navico as n
-from schemas_ping2 import ping_schema, message_id_schema, profile6_schema, \
-    parse_nmea, parse_nmea_rmc
+
+from schemas_ping2 import message_id_schema, parse_nmea, parse_nmea_rmc, \
+    ping_schema, profile6_schema
 
 if __name__ == '__main__':
     # filename = Path('data','noise.ping_packets')
@@ -21,8 +21,7 @@ if __name__ == '__main__':
             if nmea.sentence_id == 'RMC':
                 rmc = parse_nmea_rmc(nmea.words)
                 if not rmc.is_status_ok:
-                    print(f'ignoring NMEA sentence {nmea.sentence_id}')
-
+                    print(f'ignoring NMEA RMC sentence with status=invalid')
             else:
                 pass
                 # print (f'ignoring NMEA sentence {nmea.sentence_id}')
