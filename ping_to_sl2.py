@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import construct as c
@@ -22,6 +23,21 @@ if __name__ == '__main__':
                 rmc = parse_nmea_rmc(nmea.words)
                 if not rmc.is_status_ok:
                     print(f'ignoring NMEA RMC sentence with status=invalid')
+                #todo: sl2_data['todo'] = rmc.track_made_good_degrees_true
+                #todo: sl2_data['todo'] = rmc.speed_over_ground_knots
+                # NMEA: lat/long
+                # SL2: easting northing
+                # conversion as per: https://wiki.openstreetmap.org/wiki/SL2
+                POLAR_EARTH_RADIUS = 6356752.3142
+
+                temp = rmc.latitude_n * math.pi / 180
+                temp = math.tan((temp + math.pi / 2) / 2)
+                temp = math.log(temp)
+                sl2_data['northing'] = temp * POLAR_EARTH_RADIUS
+                sl2_data['easting'] = rmc.longitude_e * math.pi / 180 * \
+                                      POLAR_EARTH_RADIUS
+                sl2_data['flags']['GPPSSpeedValid'] = 1
+                sl2_data['flags']['PositionValid'] = 1
             else:
                 pass
                 # print (f'ignoring NMEA sentence {nmea.sentence_id}')
