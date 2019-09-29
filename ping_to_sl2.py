@@ -67,7 +67,6 @@ def ping_to_sl2(in_path: Path, out_path: Path):
 
         out_fd.write(sl_file_header.build(file_header))
         for pkt in ping2_packets:
-            write_frame = False
             sl2_data['frame_offset'] = out_fd.tell()
 
             if pkt.message_id.value == message_id_schema.PROFILE6:
@@ -77,9 +76,6 @@ def ping_to_sl2(in_path: Path, out_path: Path):
 
                 if first_timestamp_msec is None:
                     first_timestamp_msec = p6.timestamp_msec
-                # frame size? e.g. 2064
-                # previous frame size?
-                # packet size? e.g. 1920
                 sl2_data['time_offset'] = p6.timestamp_msec - first_timestamp_msec
                 sl2_data['frame_index'] = p6.ping_number
                 sl2_data['upper_limit_feet'] = p6.start_mm / MM_PER_FOOT
@@ -91,7 +87,7 @@ def ping_to_sl2(in_path: Path, out_path: Path):
                     np.linspace(0, 1, len(db)),
                     db
                 )
-                db3 = (db2-np.min(db2)) / np.max(db2) * (2 ** 8 - 1)
+                db3 = (db2 - np.min(db2)) / np.max(db2) * (2 ** 8 - 1)
                 # resample sounded data to the expected size
                 sl2_data['sounded_data'] = np.round(db3).astype(np.uint8).tolist()
                 pass
@@ -124,11 +120,13 @@ def ping_to_sl2(in_path: Path, out_path: Path):
                 out_fd.write(sl2_frame.build(sl2_data))
                 sl2_data['flags'] = dict()
                 sl2_data['previous_frame_size'] = sl2_data['frame_size']
-                del sl2_data['sounded_data'], sl2_data['packet_size']
+                del sl2_data['sounded_data']
 
 
 if __name__ == '__main__':
-    for in_path in Path('data').glob('Ping2*.ping_packets'):
+    in_files = list(Path('data').glob('Ping2*.ping_packets'))
+    for i, in_path in enumerate(in_files):
+        print(f'processing {i + 1}/{len(in_files)}: {in_path}')
         out_path = Path('out', in_path.name + '.sl2')
         out_path.parent.mkdir(exist_ok=True, parents=True)
 
