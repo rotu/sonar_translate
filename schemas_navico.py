@@ -4,7 +4,7 @@ sl_file_header = c.Struct(
     version=c.Enum(c.Int16ul, slg=1, sl2=2, sl3=3),
     hardware_version=c.Int16ul,
     block_size=c.Int16ul,
-    p_=c.Padding(1)
+    p_=c.Padding(2)
 )
 
 SL2_HEADER = sl_file_header.build(dict(
@@ -18,11 +18,6 @@ SL3_HEADER = sl_file_header.build(dict(
     hardware_version=1,
     block_size=3200,
 ))
-test = c.Struct(
-    a=c.Int8ul,
-    b=c.Padding(4),
-    c=c.Int8ul
-)
 
 sl2_frame = c.Struct(
     # 0
@@ -48,20 +43,20 @@ sl2_frame = c.Struct(
     # pad48=c.Bytes(50-48),
     # # 50
     # frequency=c.Enum(c.Int8ul, KHz200=0, KHz50=1, KHz83=2, KHz455=3, KHz800=4,
-    # #     Khz38=5, KHz28=6, Khz130Khz210=7, Khz90Khz150=8, KHz40Khz60=9,
+    # #     Khz38=5, KHz28=]6, Khz130Khz210=7, Khz90Khz150=8, KHz40Khz60=9,
     # #     KHz25KHz45=10),
-    pad51=c.Bytes(60 - 48),
+    pad51=c.Padding(60 - 48),
     # 60
-    time1=c.Int32ul,  # current unix epoch = 1569437027
+    time1=c.Int32sl,  # current unix epoch = 1569437027
     water_depth_feet=c.Float32l,
     keel_depth_feet=c.Float32l,
     # 68
-    pad2=c.Bytes(100 - 72),
+    pad2=c.Padding(100 - 72),
     # 100
-    speed_knots=c.Float32l,
+    gps_speed_knots=c.Float32l,
     water_temperature_c=c.Float32l,
-    easting=c.Int32ul,
-    northing=c.Int32ul,
+    easting=c.Int32sl,
+    northing=c.Int32sl,
     water_speed_knots=c.Float32l,
     course_over_ground_radians=c.Float32l,
     altitude_ft=c.Float32l,
@@ -79,7 +74,7 @@ sl2_frame = c.Struct(
         **{f'Flag{i}': 1 << i for i in (0, 3, 5, 10, 11, 12, 13, 14, 15)}
     ),
     # 134
-    _pad3=c.Bytes(140 - 134),
+    _pad3=c.Padding(140 - 134),
     # 140
     time_offset=c.Int32ul,
     sounded_data=c.Array(c.this.packet_size, c.Int8ul),

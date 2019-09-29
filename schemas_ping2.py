@@ -1,7 +1,13 @@
+import math
 import re
 import warnings
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional, Sequence
 
 import construct as c
+import numpy as np
+from numpy.ma import log
 
 message_id_schema = c.Enum(
     c.Int16ul,
@@ -47,10 +53,16 @@ profile6_schema = c.Struct(
     scaled_db_pwr_results=c.Array(c.this.num_results, c.Int16ul)
 )
 
-from typing import Sequence
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
+
+def get_ranges_db(p6):
+    assert math.isclose(p6.max_pwr - p6.min_pwr,
+        p6.step_db * ((1 << 16) - 1))
+
+    pwr_or_db = (
+        p6.min_pwr + np.array(p6.scaled_db_pwr_results) * p6.step_db
+    )
+    db = pwr_or_db if p6.is_db else np.ma.log(pwr_or_db)
+    return db
 
 
 @dataclass

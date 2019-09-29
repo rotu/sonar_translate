@@ -7,7 +7,8 @@ from types import SimpleNamespace
 import construct as c
 import schemas_ping2
 from schemas_ping2 import parse_nmea, parse_nmea_rmc
-
+import matplotlib.pyplot as plt
+import numpy as np
 
 def from_construct(a_construct):
     if isinstance(a_construct, c.ListContainer):
@@ -26,28 +27,29 @@ def from_construct(a_construct):
 
 if __name__ == '__main__':
     # filename = Path('data','noise.ping_packets')
-    filename = Path('data', 'good barge at 25m.ping_packets')
+    # filename = Path('data', 'good barge at 25m.ping_packets')
+    filename = Path('data', 'Ping2-Fri Sep 27 16-34-30 2019-10.ping_packets')
 
     parsed = c.GreedyRange(schemas_ping2.ping_schema).parse_file(filename)
 
     ping_packets = from_construct(parsed)
-    talkers = Counter()
-    sentences = Counter()
-    talker_sentences = Counter()
-
-    for pkt in ping_packets:
-        if pkt.message_id == schemas_ping2.message_id_schema.NMEA0183:
-            nmea = parse_nmea(pkt.payload)
-            talkers[nmea.talker_id] += 1
-            sentences[nmea.sentence_id] += 1
-            talker_sentences[nmea.talker_id + nmea.sentence_id] += 1
-
-            if nmea.sentence_id == 'RMC':
-                print(parse_nmea_rmc(nmea.words))
-
-    print(f'nmea talkers: {talkers}')
-    print(f'nmea sentences: {sentences}')
-    print(f'talker sentences: {talker_sentences}')
+    # talkers = Counter()
+    # sentences = Counter()
+    # talker_sentences = Counter()
+    #
+    # for pkt in ping_packets:
+    #     if pkt.message_id == schemas_ping2.message_id_schema.NMEA0183:
+    #         nmea = parse_nmea(pkt.payload)
+    #         talkers[nmea.talker_id] += 1
+    #         sentences[nmea.sentence_id] += 1
+    #         talker_sentences[nmea.talker_id + nmea.sentence_id] += 1
+    #
+    #         if nmea.sentence_id == 'RMC':
+    #             print(parse_nmea_rmc(nmea.words))
+    #
+    # print(f'nmea talkers: {talkers}')
+    # print(f'nmea sentences: {sentences}')
+    # print(f'talker sentences: {talker_sentences}')
 
     # nmea talkers: Counter({'GN': 13, 'GP': 9, 'GL': 6})
     # nmea sentences: Counter({'GSV': 15, 'GSA': 5, 'GLL': 2, 'RMC': 2, 'VTG': 2, 'GGA': 2})
@@ -69,9 +71,6 @@ if __name__ == '__main__':
     )) for pkt in ping_packets if
         pkt.message_id == schemas_ping2.message_id_schema.PROFILE6]
 
-    import matplotlib.pyplot as plt
-    import numpy as np
-
     min_time = p6_packets[0].timestamp_msec / 1000
     max_time = p6_packets[-1].timestamp_msec / 1000
     if not (min_time < max_time):
@@ -85,13 +84,7 @@ if __name__ == '__main__':
     imdata = []
 
     for p6 in p6_packets:
-        assert math.isclose(p6.max_pwr - p6.min_pwr,
-            p6.step_db * ((1 << 16) - 1))
-
-        pwr_or_db = (
-            p6.min_pwr + np.array(p6.scaled_db_pwr_results) * p6.step_db
-        )
-        db = pwr_or_db if p6.is_db else log(pwr_or_db)
+        db = schemas_ping2.get_ranges_db(p6)
         imrow = np.interp(
             np.linspace(min_dist_mm, max_dist_mm, n_dist),
             np.linspace(p6.start_mm, p6.start_mm + p6.length_mm, len(db)),
