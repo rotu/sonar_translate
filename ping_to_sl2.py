@@ -4,7 +4,7 @@ from pathlib import Path
 import construct as c
 import numpy as np
 
-from schemas_navico import sl2_frame, SL2_HEADER, sl_file_header
+from schemas_navico import sl2_frame, SL2_HEADER, sl_file_header, Frequency, ChannelType
 from schemas_ping2 import message_id_schema, parse_nmea, parse_nmea_rmc, \
     ping_schema, profile6_schema, get_ranges_db
 
@@ -32,19 +32,11 @@ def ping_to_sl2(in_path: Path, out_path: Path):
 
     sl2_data = dict(
         flags={},
-        channel_type='SidescanRight',
-        # CreationDateTime. A value of -1 means not set. Otherwise a POSIX time
-        time1=-1,
+        channel_type=ChannelType.SidescanRight,
 
         frame_offset=0,
-        last_frame_offset_primary=0,
-        last_frame_offset_secondary=0,
-        last_frame_offset_down_scan=0,
-        last_frame_offset_left=0,
-        last_frame_offset_right=0,
-        last_frame_offset_composite=0,
-
         previous_frame_size=0,
+        frequency=Frequency.KHz455,
 
         altitude_ft=0.0,
         course_over_ground_radians=0.0,

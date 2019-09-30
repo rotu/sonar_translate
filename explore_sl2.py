@@ -18,6 +18,7 @@ if __name__ == '__main__':
             frame = sl2_frame.parse(file_bytes[i:])
             assert frame.frame_offset == i
             blocks.append(frame)
+            pass
             # v in frame.flags.items() if v and k!='_flagsenum')))
         except c.ConstructError as e:
             print(f'failed to parse block at {i} for reason: {e}')
