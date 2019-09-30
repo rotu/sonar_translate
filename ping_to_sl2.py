@@ -12,19 +12,17 @@ MM_PER_FOOT = 304.8
 SIDESCAN_PACKET_SIZE = 3200
 
 
-def lat_long_to_northing_easting(latitude_n, longitude_e):
+def lat_long_to_navico_northing_easting(latitude_n, longitude_e):
     POLAR_EARTH_RADIUS = 6356752.3142
 
     # NMEA: lat/long
     # SL2: easting northing
-    # conversion as per: https://wiki.openstreetmap.org/wiki/SL2
-    temp = latitude_n * math.pi / 180
-    temp = math.tan((temp + math.pi / 2) / 2)
-    temp = math.log(temp)
-    northing = temp * POLAR_EARTH_RADIUS
-    easting = longitude_e * math.pi / 180 * \
-              POLAR_EARTH_RADIUS
-    return northing, easting
+
+    northing = POLAR_EARTH_RADIUS * math.log(
+        math.tan((latitude_n * math.pi / 180 + math.pi / 2) / 2))
+
+    easting = longitude_e * math.pi / 180 * POLAR_EARTH_RADIUS
+    return round(northing), round(easting)
 
 
 def ping_to_sl2(in_path: Path, out_path: Path):
@@ -32,7 +30,7 @@ def ping_to_sl2(in_path: Path, out_path: Path):
 
     sl2_data = dict(
         flags={},
-        channel_type=ChannelType.SidescanRight,
+        channel_type=ChannelType.SidescanComposite,
 
         frame_offset=0,
         previous_frame_size=0,
@@ -74,12 +72,12 @@ def ping_to_sl2(in_path: Path, out_path: Path):
                 sl2_data['lower_limit_feet'] = (p6.start_mm + p6.length_mm) / MM_PER_FOOT
                 sl2_data['packet_size'] = SIDESCAN_PACKET_SIZE
                 db = get_ranges_db(p6)
-                db2 = np.interp(
-                    np.linspace(0, 1, 3200),
-                    np.linspace(0, 1, len(db)),
-                    db
+                db2 = (db - np.min(db)) / (np.max(db)-np.min(db)) * (2 ** 8 - 1)
+                db3 = np.interp(
+                    np.linspace(-1, 1, 3200),
+                    np.linspace(0, 1, len(db2)),
+                    db2
                 )
-                db3 = (db2 - np.min(db2)) / np.max(db2) * (2 ** 8 - 1)
                 # resample sounded data to the expected size
                 sl2_data['sounded_data'] = np.round(db3).astype(np.uint8).tolist()
                 pass
@@ -92,7 +90,7 @@ def ping_to_sl2(in_path: Path, out_path: Path):
                     sl2_data['heading_radians'] = rmc.track_made_good_degrees_true * math.pi / 180
                     sl2_data['water_speed_knots'] = rmc.speed_over_ground_knots
                     sl2_data['gps_speed_knots'] = rmc.speed_over_ground_knots
-                    northing, easting = lat_long_to_northing_easting(
+                    northing, easting = lat_long_to_navico_northing_easting(
                         rmc.latitude_n, rmc.longitude_e)
                     sl2_data['northing'] = int(round(northing))
                     sl2_data['easting'] = int(round(easting))

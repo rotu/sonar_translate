@@ -33,7 +33,7 @@ ValidFlags = c.FlagsEnum(
 
 ChannelType = c.Enum(
     c.Int16ul, Primary=0, Secondary=1, DownScan=2,
-    SidescanLeft=3, SidescanRight=4, SidescanComposite=5)
+    Unknown1=3, Unknown2=4, SidescanComposite=5, SidescanStarboard=13, SidescanPort=14)
 
 Frequency = c.Enum(
     c.Int8ul, KHz200=0, KHz50=1, KHz83=2, KHz455=3, KHz800=4,
@@ -50,7 +50,7 @@ sl2_frame = c.Struct(
     last_frame_offset_right=c.Default(c.Int32ul, 0),
     last_frame_offset_composite=c.Default(c.Int32ul, 0),
     # 28
-    frame_size=c.Rebuild(c.Int16ul, c.this.packet_size + 144),
+    frame_size=c.Int16ul,
     previous_frame_size=c.Int16ul,
     channel_type=ChannelType,
     packet_size=c.Int16ul,
