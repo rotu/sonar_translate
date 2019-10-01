@@ -6,7 +6,7 @@ import numpy as np
 
 from schemas_navico import sl2_frame, SL2_HEADER, sl_file_header, Frequency, ChannelType
 from schemas_ping2 import message_id_schema, parse_nmea, parse_nmea_rmc, \
-    ping_schema, profile6_schema, get_ranges_db
+    ping_schema, profile6_schema, get_ranges_db, get_ranges_power
 
 MM_PER_FOOT = 304.8
 SIDESCAN_PACKET_SIZE = 3200
@@ -71,15 +71,17 @@ def ping_to_sl2(in_path: Path, out_path: Path):
                 sl2_data['upper_limit_feet'] = p6.start_mm / MM_PER_FOOT
                 sl2_data['lower_limit_feet'] = (p6.start_mm + p6.length_mm) / MM_PER_FOOT
                 sl2_data['packet_size'] = SIDESCAN_PACKET_SIZE
-                db = get_ranges_db(p6)
-                db2 = (db - np.min(db)) / (np.max(db)-np.min(db)) * (2 ** 8 - 1)
-                db3 = np.interp(
+                pwr = get_ranges_power(p6)
+                pwr2 = (pwr - np.min(pwr)) / (np.max(pwr) - np.min(pwr))
+                # data is now scaled 0-1
+                pwr3 = np.interp(
                     np.linspace(-1, 1, 3200),
-                    np.linspace(0, 1, len(db2)),
-                    db2
-                )
+                    np.linspace(0, 1, len(pwr3)),
+                    pwr3,
+                ) * (2 ** 8 - 1)
+
                 # resample sounded data to the expected size
-                sl2_data['sounded_data'] = np.round(db3).astype(np.uint8).tolist()
+                sl2_data['sounded_data'] = np.round(pwr3).astype(np.uint8).tolist()
                 pass
             elif pkt.message_id.value == message_id_schema.NMEA0183:
                 nmea = parse_nmea(pkt.payload.value)
