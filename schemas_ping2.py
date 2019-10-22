@@ -54,14 +54,14 @@ profile6_schema = c.Struct(
 )
 
 
-def get_ranges_power(p6):
+def get_ranges_root_power(p6):
     assert math.isclose(p6.max_pwr - p6.min_pwr,
         p6.step_db * ((1 << 16) - 1))
 
     pwr_or_db = (
         p6.min_pwr + np.array(p6.scaled_db_pwr_results) * p6.step_db
     )
-    pwr = pwr_or_db if not p6.is_db else np.ma.exp(pwr_or_db)
+    pwr = np.sqrt(pwr_or_db) if not p6.is_db else np.power(10, pwr_or_db / 20)
     return pwr
 
 
@@ -72,7 +72,7 @@ def get_ranges_db(p6):
     pwr_or_db = (
         p6.min_pwr + np.array(p6.scaled_db_pwr_results) * p6.step_db
     )
-    db = pwr_or_db if p6.is_db else np.ma.log(pwr_or_db)
+    db = pwr_or_db if p6.is_db else 10 * np.log(pwr_or_db, 10)
     return db
 
 
